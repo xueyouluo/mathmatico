@@ -1,0 +1,5 @@
+{
+  "name": "MathMatico",
+  "description": "A factory automation game for learning math. Build belts and machines to process numbers and reach the target!",
+  "requestFramePermissions": []
+}
