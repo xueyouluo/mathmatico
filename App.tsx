@@ -90,7 +90,19 @@ const App: React.FC = () => {
   const [selectedNumber, setSelectedNumber] = useState<number>(1);
 
   const [paused, setPaused] = useState<boolean>(false);
-  const [showTutorial, setShowTutorial] = useState<boolean>(true);
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
+    try {
+      const hasScore = localStorage.getItem('mathmatico_score');
+      const hasLevel = localStorage.getItem('mathmatico_levelIndex');
+      const tutorialSeen = localStorage.getItem('mathmatico_tutorial_seen');
+      
+      // Don't show if user has played before (score/level exists) or explicitly seen it
+      if (hasScore || hasLevel || tutorialSeen) return false;
+      return true;
+    } catch (e) {
+      return true;
+    }
+  });
   const [tutorialStep, setTutorialStep] = useState<number>(0);
   
   // Hint State
@@ -177,8 +189,11 @@ const App: React.FC = () => {
                dragStartPixelPos.current = { x: touch.clientX, y: touch.clientY };
                
                // Execute Interact immediately (Tap logic)
-               // Check for Extractor drag-out start
-               if (gameState.grid[y][x].building === BuildingType.EXTRACTOR) {
+               // Check for Extractor/Processor drag-out start (Mirroring handleMouseDown)
+               const startTile = gameState.grid[y][x];
+               const isProcessor = [BuildingType.ADDER, BuildingType.SUBTRACTOR, BuildingType.MULTIPLIER, BuildingType.DIVIDER].includes(startTile.building);
+
+               if ((startTile.building === BuildingType.EXTRACTOR || isProcessor) && selectedBuilding !== BuildingType.NONE) {
                    isDragOutFromExtractor.current = true;
                } else {
                    isDragOutFromExtractor.current = false;
@@ -573,6 +588,7 @@ const App: React.FC = () => {
       setTutorialStep(prev => prev + 1);
     } else {
       setShowTutorial(false);
+      try { localStorage.setItem('mathmatico_tutorial_seen', 'true'); } catch (e) {}
     }
   };
 
@@ -673,10 +689,7 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* Level Description Banner */}
-      <div className="w-full bg-indigo-50/90 backdrop-blur-sm text-indigo-800 py-1 text-center text-sm font-medium border-b border-indigo-100 px-4 truncate z-10">
-         {gameState.currentLevel.description}
-      </div>
+
 
       {/* Main Game Area - Flex 1 to take remaining space */}
       <div 
@@ -686,11 +699,11 @@ const App: React.FC = () => {
         {/* Floating Hint Button */}
         <button 
             onClick={handleHint}
-            className="absolute top-4 right-4 z-20 bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border-2 border-yellow-300 animate-bounce-subtle"
+            className="absolute top-2 right-2 md:top-4 md:right-4 z-20 bg-yellow-400 hover:bg-yellow-500 text-white font-bold p-2 md:py-2 md:px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border-2 border-yellow-300 animate-bounce-subtle opacity-90 hover:opacity-100"
             title="消耗 1000 分获取提示"
         >
             <Lightbulb size={20} fill="currentColor" />
-            <span>提示 (-1000)</span>
+            <span className="hidden md:inline">提示 (-1000)</span>
         </button>
 
         {/* Grid Wrapper with Dynamic Scale */}
