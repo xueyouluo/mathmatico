@@ -5,12 +5,27 @@ import Controls from './components/Controls';
 import { GameState, BuildingType, Direction, GRID_WIDTH, GRID_HEIGHT, Tile, Difficulty, GameSpeed } from './types';
 import { initializeGrid, processTick } from './utils/gameLogic';
 import { TICK_RATE_MS, generateLevel } from './constants';
-import { Trophy, HelpCircle, Play, Pause, RefreshCw, ArrowRight, Star, ChevronRight, ChevronLeft, BookOpen, BrainCircuit, Calculator, Sigma, Binary, Percent, Divide, Plus, X, Minus, Lightbulb, Zap, FastForward, Activity } from 'lucide-react';
+import { Trophy, HelpCircle, Play, Pause, RefreshCw, ArrowRight, Star, ChevronRight, ChevronLeft, BookOpen, BrainCircuit, Calculator, Sigma, Binary, Percent, Divide, Plus, X, Minus, Lightbulb, Zap, FastForward, Activity, Globe } from 'lucide-react';
 import clsx from 'clsx';
 import TutorialDemo from './components/TutorialDemo';
 import { solveLevel } from './utils/solver';
+import { Language, detectLanguage, translations } from './utils/i18n';
 
 const App: React.FC = () => {
+  const [lang, setLang] = useState<Language>(() => {
+      const saved = localStorage.getItem('mathmatico_lang');
+      if (saved === 'zh' || saved === 'en') return saved;
+      return detectLanguage();
+  });
+  
+  const t = translations[lang];
+
+  const toggleLanguage = () => {
+    const newLang = lang === 'zh' ? 'en' : 'zh';
+    setLang(newLang);
+    localStorage.setItem('mathmatico_lang', newLang);
+  };
+
   // Game Configuration
   const [difficulty, setDifficulty] = useState<Difficulty>(() => {
     try {
@@ -51,7 +66,7 @@ const App: React.FC = () => {
 
   const handleHint = () => {
     if (gameState.score < 1000) {
-      setHintContent("需要 1000 分才能查看提示！");
+      setHintContent(t.hint_need_points);
       setShowHint(true);
       return;
     }
@@ -67,7 +82,7 @@ const App: React.FC = () => {
     });
 
     if (sources.length === 0) {
-      setHintContent("地图上没有数字源！");
+      setHintContent(t.hint_no_sources);
       setShowHint(true);
       return;
     }
@@ -80,7 +95,7 @@ const App: React.FC = () => {
       // Deduct score
       setGameState(prev => ({ ...prev, score: prev.score - 1000 }));
     } else {
-      setHintContent("抱歉，暂未找到简单的组合解法，请尝试利用更多的数字！");
+      setHintContent(t.hint_no_solution);
     }
     setShowHint(true);
   };
@@ -228,28 +243,28 @@ const App: React.FC = () => {
   // Tutorial Steps
   const TUTORIAL_STEPS = [
     {
-      title: "欢迎来到无尽工厂",
-      content: "这是一个无限挑战。你的目标是利用地图上的资源，合成目标数字并输送到绿色的【中心】。",
+      title: t.tut_intro_title,
+      content: t.tut_intro_content,
       demo: <TutorialDemo type="goal" />
     },
     {
-      title: "随机资源与方向",
-      content: "地图上会随机生成数字。在【困难模式】下，偶尔会出现 10-99 的大数字！利用除法和减法来削减它们，以达成目标。",
+      title: t.tut_resources_title,
+      content: t.tut_resources_content,
       demo: <TutorialDemo type="resources" />
     },
     {
-      title: "运算机器",
-      content: "机器需要两个输入。对于减法和除法，【先到达】的数字是被减数/被除数（左边），【后到达】的是减数/除数（右边）。结果沿箭头输出。",
+      title: t.tut_machines_title,
+      content: t.tut_machines_content,
       demo: <TutorialDemo type="math" />
     },
     {
-      title: "调整与删除",
-      content: "点错了吗？选择【橡皮擦】或直接【点击鼠标右键】即可删除。点击已有的方块可以【旋转】它的方向。",
+      title: t.tut_controls_title,
+      content: t.tut_controls_content,
       demo: <TutorialDemo type="controls" />
     },
     {
-      title: "难度选择",
-      content: "觉得太难？可以点击顶部的开关切换【简单模式】（仅加减法，数字小）或【困难模式】（包含乘除法，有大数字）。",
+      title: t.tut_difficulty_title,
+      content: t.tut_difficulty_content,
       demo: <div className="flex items-center justify-center h-48 bg-gray-50 rounded-xl mb-4 overflow-hidden"><BrainCircuit className="text-emerald-500" size={64} /></div>
     }
   ];
@@ -623,7 +638,7 @@ const App: React.FC = () => {
         {/* Left: Level Info & Difficulty */}
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
             <div className="bg-indigo-600 text-white px-3 py-2 rounded-lg shadow-sm flex items-center gap-2 whitespace-nowrap">
-               <span className="font-bold">第 {gameState.currentLevel.id} 关</span>
+               <span className="font-bold">{t.level.replace('{n}', gameState.currentLevel.id.toString())}</span>
             </div>
             
             <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
@@ -634,7 +649,7 @@ const App: React.FC = () => {
                         difficulty === 'EASY' ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
                     )}
                 >
-                    简单
+                    {t.easy}
                 </button>
                 <button 
                     onClick={() => toggleDifficulty('HARD')}
@@ -643,12 +658,16 @@ const App: React.FC = () => {
                         difficulty === 'HARD' ? "bg-white text-orange-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
                     )}
                 >
-                    困难
+                    {t.hard}
                 </button>
             </div>
 
-            <button onClick={() => { setShowTutorial(true); setTutorialStep(0); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-500" title="帮助">
+            <button onClick={() => { setShowTutorial(true); setTutorialStep(0); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-500" title={t.help}>
                 <BookOpen size={24} />
+            </button>
+
+            <button onClick={toggleLanguage} className="p-2 hover:bg-gray-100 rounded-full text-gray-500" title={lang === 'zh' ? 'Switch to English' : '切换到中文'}>
+                <Globe size={24} />
             </button>
 
         </div>
@@ -656,7 +675,7 @@ const App: React.FC = () => {
         {/* Center: Targets */}
         <div className="flex items-center gap-4 md:gap-8">
             <div className="flex flex-col items-center">
-                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">目标</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{t.target}</span>
                 <div className="text-3xl md:text-4xl font-black text-indigo-600">
                     {gameState.currentLevel.target}
                 </div>
@@ -665,7 +684,7 @@ const App: React.FC = () => {
             <div className="h-10 w-px bg-gray-200"></div>
 
             <div className="flex flex-col items-center relative">
-                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">总分</span>
+                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{t.score}</span>
                 <div className="text-2xl md:text-3xl font-bold text-emerald-600 flex items-center gap-2">
                     <Trophy size={20} />
                     {gameState.score}
@@ -683,7 +702,7 @@ const App: React.FC = () => {
             <button onClick={() => setPaused(!paused)} className="p-3 bg-gray-100 hover:bg-gray-200 rounded-lg font-semibold text-gray-700 flex gap-2">
                 {paused ? <Play size={20} /> : <Pause size={20} />}
             </button>
-            <button onClick={resetGame} className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-semibold flex gap-2" title="重新开始">
+            <button onClick={resetGame} className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-semibold flex gap-2" title={t.reset_game}>
                 <RefreshCw size={20} />
             </button>
         </div>
@@ -700,10 +719,10 @@ const App: React.FC = () => {
         <button 
             onClick={handleHint}
             className="absolute top-2 right-2 md:top-4 md:right-4 z-20 bg-yellow-400 hover:bg-yellow-500 text-white font-bold p-2 md:py-2 md:px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border-2 border-yellow-300 animate-bounce-subtle opacity-90 hover:opacity-100"
-            title="消耗 1000 分获取提示"
+            title={t.hint_cost}
         >
             <Lightbulb size={20} fill="currentColor" />
-            <span className="hidden md:inline">提示 (-1000)</span>
+            <span className="hidden md:inline">{t.hint_cost}</span>
         </button>
 
         {/* Grid Wrapper with Dynamic Scale */}
@@ -769,6 +788,7 @@ const App: React.FC = () => {
               difficulty={difficulty}
               speed={speed}
               onToggleSpeed={() => setSpeed(s => s === 'NORMAL' ? 'FAST' : s === 'FAST' ? 'INSANE' : 'NORMAL')}
+              lang={lang}
             />
          </div>
       </div>
@@ -782,15 +802,15 @@ const App: React.FC = () => {
                <HelpCircle size={48} />
             </div>
             
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">遇到困难了吗？</h2>
-            <p className="text-gray-500 text-sm mb-6">您已经思考了一段时间。是否需要消耗 <span className="font-bold text-red-500">1000</span> 分来获取一步关键提示？</p>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.hint_stuck_title}</h2>
+            <p className="text-gray-500 text-sm mb-6">{t.hint_stuck_desc} <span className="font-bold text-red-500">1000</span> {t.hint_stuck_desc_2}</p>
 
             <div className="flex gap-3 w-full">
                 <button 
                   onClick={() => setShowHintOffer(false)}
                   className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold transition-all"
                 >
-                  不需要
+                  {t.no_thanks}
                 </button>
                 <button 
                   onClick={() => {
@@ -799,7 +819,7 @@ const App: React.FC = () => {
                   }}
                   className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-1"
                 >
-                  <Lightbulb size={18} fill="currentColor" /> 获取提示
+                  <Lightbulb size={18} fill="currentColor" /> {t.get_hint}
                 </button>
             </div>
           </div>
@@ -821,8 +841,8 @@ const App: React.FC = () => {
                <Lightbulb size={48} fill="currentColor" />
             </div>
             
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">运算提示</h2>
-            <p className="text-gray-500 text-sm mb-6">利用当前的资源，可以尝试以下组合：</p>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.op_hint_title}</h2>
+            <p className="text-gray-500 text-sm mb-6">{t.op_hint_desc}</p>
 
             {/* Equation Display */}
             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 w-full mb-6">
@@ -835,7 +855,7 @@ const App: React.FC = () => {
               onClick={() => setShowHint(false)}
               className="w-full py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold shadow-lg shadow-yellow-200 transition-all"
             >
-              明白了
+              {t.got_it}
             </button>
           </div>
         </div>
@@ -854,16 +874,16 @@ const App: React.FC = () => {
                     <Star size={64} fill="currentColor" className="animate-spin-slow" />
                  </div>
               </div>
-              <h2 className="text-4xl font-black text-gray-800 mb-2">关卡完成!</h2>
+              <h2 className="text-4xl font-black text-gray-800 mb-2">{t.level_complete}</h2>
               <p className="text-gray-500 text-lg mb-8">
-                成功合成数字 <span className="font-bold text-indigo-600 text-2xl">{gameState.currentLevel.target}</span> !
+                {t.success_msg} <span className="font-bold text-indigo-600 text-2xl">{gameState.currentLevel.target}</span> !
               </p>
               
               <button 
                 onClick={nextLevel}
                 className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xl shadow-lg shadow-indigo-200 transition-all transform hover:scale-105 flex items-center justify-center gap-2"
               >
-                下一关 <ArrowRight size={24} />
+                {t.next_level} <ArrowRight size={24} />
               </button>
             </div>
           </div>
@@ -899,14 +919,14 @@ const App: React.FC = () => {
                         disabled={tutorialStep === 0}
                         className="flex-1 py-3 rounded-xl font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1"
                     >
-                       <ChevronLeft size={20} /> 上一步
+                       <ChevronLeft size={20} /> {t.prev_step}
                     </button>
                     
                     <button 
                         onClick={handleNextStep}
                         className="flex-[2] py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2"
                     >
-                        {tutorialStep === TUTORIAL_STEPS.length - 1 ? '开始游戏' : '下一步'} 
+                        {tutorialStep === TUTORIAL_STEPS.length - 1 ? t.start_game : t.next_step} 
                         {tutorialStep !== TUTORIAL_STEPS.length - 1 && <ChevronRight size={20} />}
                     </button>
                 </div>

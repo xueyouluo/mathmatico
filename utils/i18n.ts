@@ -1,0 +1,112 @@
+export type Language = 'zh' | 'en';
+
+export const detectLanguage = (): Language => {
+  if (typeof navigator === 'undefined') return 'en';
+  const lang = navigator.language.toLowerCase();
+  return lang.includes('zh') ? 'zh' : 'en';
+};
+
+export const translations = {
+  zh: {
+    level: "第 {n} 关",
+    easy: "简单",
+    hard: "困难",
+    target: "目标",
+    score: "总分",
+    hint: "提示",
+    hint_cost: "提示 (-1000)",
+    hint_need_points: "需要 1000 分才能查看提示！",
+    hint_no_sources: "地图上没有数字源！",
+    hint_no_solution: "抱歉，暂未找到简单的组合解法，请尝试利用更多的数字！",
+    hint_stuck_title: "遇到困难了吗？",
+    hint_stuck_desc: "您已经思考了一段时间。是否需要消耗",
+    hint_stuck_desc_2: "分来获取一步关键提示？",
+    no_thanks: "不需要",
+    get_hint: "获取提示",
+    op_hint_title: "运算提示",
+    op_hint_desc: "利用当前的资源，可以尝试以下组合：",
+    got_it: "明白了",
+    level_complete: "关卡完成!",
+    success_msg: "成功合成数字",
+    next_level: "下一关",
+    prev_step: "上一步",
+    next_step: "下一步",
+    start_game: "开始游戏",
+    reset_game: "重新开始",
+    help: "帮助",
+    
+    // Controls
+    eraser: "橡皮擦",
+    belt: "传送带",
+    adder: "加法",
+    subtractor: "减法",
+    multiplier: "乘法",
+    divider: "除法",
+    speed: "速度",
+    controls_hint: "提示: 地图上会随机生成数字源，请利用它们！",
+    easy_mode_hidden: " (简单模式已隐藏乘除法)",
+
+    // Tutorial
+    tut_intro_title: "欢迎来到 Mathmatico",
+    tut_intro_content: "这是一个无限挑战。你的目标是利用地图上的资源，合成目标数字并输送到绿色的【中心】。",
+    tut_resources_title: "随机资源与方向",
+    tut_resources_content: "地图上会随机生成数字。在【困难模式】下，偶尔会出现 10-99 的大数字！利用除法和减法来削减它们，以达成目标。",
+    tut_machines_title: "运算机器",
+    tut_machines_content: "机器需要两个输入。对于减法和除法，【先到达】的数字是被减数/被除数（左边），【后到达】的是减数/除数（右边）。结果沿箭头输出。",
+    tut_controls_title: "调整与删除",
+    tut_controls_content: "点错了吗？选择【橡皮擦】或直接【点击鼠标右键】即可删除。点击已有的方块可以【旋转】它的方向。",
+    tut_difficulty_title: "难度选择",
+    tut_difficulty_content: "觉得太难？可以点击顶部的开关切换【简单模式】（仅加减法，数字小）或【困难模式】（包含乘除法，有大数字）。",
+  },
+  en: {
+    level: "Level {n}",
+    easy: "Easy",
+    hard: "Hard",
+    target: "Target",
+    score: "Score",
+    hint: "Hint",
+    hint_cost: "Hint (-1000)",
+    hint_need_points: "Need 1000 points to use hint!",
+    hint_no_sources: "No number sources on the map!",
+    hint_no_solution: "Sorry, no simple solution found yet. Try using more numbers!",
+    hint_stuck_title: "Stuck?",
+    hint_stuck_desc: "You've been thinking for a while. Do you want to spend",
+    hint_stuck_desc_2: "points for a key hint?",
+    no_thanks: "No thanks",
+    get_hint: "Get Hint",
+    op_hint_title: "Operation Hint",
+    op_hint_desc: "Using current resources, try this combination:",
+    got_it: "Got it",
+    level_complete: "Level Complete!",
+    success_msg: "Successfully synthesized number",
+    next_level: "Next Level",
+    prev_step: "Previous",
+    next_step: "Next",
+    start_game: "Start Game",
+    reset_game: "Restart Game",
+    help: "Help",
+
+    // Controls
+    eraser: "Eraser",
+    belt: "Belt",
+    adder: "Adder",
+    subtractor: "Subtractor",
+    multiplier: "Multiplier",
+    divider: "Divider",
+    speed: "Speed",
+    controls_hint: "Hint: Number sources spawn randomly on the map. Use them!",
+    easy_mode_hidden: " (Multiplier/Divider hidden in Easy Mode)",
+
+    // Tutorial
+    tut_intro_title: "Welcome to Mathmatico",
+    tut_intro_content: "This is an infinite challenge. Your goal is to use resources on the map to synthesize the target number and deliver it to the green [HUB].",
+    tut_resources_title: "Resources & Directions",
+    tut_resources_content: "Numbers spawn randomly. In [Hard Mode], large numbers (10-99) may appear! Use division and subtraction to reduce them to reach the target.",
+    tut_machines_title: "Math Machines",
+    tut_machines_content: "Machines need two inputs. For Subtraction/Division, the [First Arrived] is the Left Operand, and the [Second Arrived] is the Right Operand. Results output along the arrow.",
+    tut_controls_title: "Controls & Deletion",
+    tut_controls_content: "Mistake? Select [Eraser] or [Right Click] to delete. Click existing tiles to [Rotate] them.",
+    tut_difficulty_title: "Difficulty",
+    tut_difficulty_content: "Too hard? Switch to [Easy Mode] (Add/Sub only, small numbers) or [Hard Mode] (Mul/Div included, larger numbers) at the top.",
+  }
+};

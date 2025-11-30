@@ -1,8 +1,8 @@
-
 import React from 'react';
 import { BuildingType, Difficulty, GameSpeed } from '../types';
 import { ArrowUp, Plus, Minus, X, Divide, Eraser, ChevronsUp, Zap, FastForward } from 'lucide-react';
 import clsx from 'clsx';
+import { Language, translations } from '../utils/i18n';
 
 interface ControlsProps {
   selectedBuilding: BuildingType;
@@ -12,18 +12,21 @@ interface ControlsProps {
   difficulty: Difficulty;
   speed: GameSpeed;
   onToggleSpeed: () => void;
+  lang: Language;
 }
 
-const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selectedNumber, onSelectNumber, difficulty, speed, onToggleSpeed }) => {
+const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selectedNumber, onSelectNumber, difficulty, speed, onToggleSpeed, lang }) => {
   
+  const t = translations[lang];
+
   // Removed EXTRACTOR from available buttons
   let buttons = [
-    { type: BuildingType.NONE, icon: <Eraser size={20} />, label: '橡皮擦', color: 'bg-red-50 text-red-600 border-red-200' },
-    { type: BuildingType.BELT, icon: <ChevronsUp size={20} />, label: '传送带', color: 'bg-gray-100 text-gray-700' },
-    { type: BuildingType.ADDER, icon: <Plus size={20} />, label: '加法', color: 'bg-blue-100 text-blue-700' },
-    { type: BuildingType.SUBTRACTOR, icon: <Minus size={20} />, label: '减法', color: 'bg-red-100 text-red-700' },
-    { type: BuildingType.MULTIPLIER, icon: <X size={20} />, label: '乘法', color: 'bg-purple-100 text-purple-700' },
-    { type: BuildingType.DIVIDER, icon: <Divide size={20} />, label: '除法', color: 'bg-orange-100 text-orange-700' },
+    { type: BuildingType.NONE, icon: <Eraser size={20} />, label: t.eraser, color: 'bg-red-50 text-red-600 border-red-200' },
+    { type: BuildingType.BELT, icon: <ChevronsUp size={20} />, label: t.belt, color: 'bg-gray-100 text-gray-700' },
+    { type: BuildingType.ADDER, icon: <Plus size={20} />, label: t.adder, color: 'bg-blue-100 text-blue-700' },
+    { type: BuildingType.SUBTRACTOR, icon: <Minus size={20} />, label: t.subtractor, color: 'bg-red-100 text-red-700' },
+    { type: BuildingType.MULTIPLIER, icon: <X size={20} />, label: t.multiplier, color: 'bg-purple-100 text-purple-700' },
+    { type: BuildingType.DIVIDER, icon: <Divide size={20} />, label: t.divider, color: 'bg-orange-100 text-orange-700' },
   ];
 
   if (difficulty === 'EASY') {
@@ -60,17 +63,17 @@ const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selecte
               "flex flex-col items-center justify-center min-w-[3.5rem] w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 transition-all snap-center shrink-0",
               speed === 'INSANE' ? "bg-purple-100 text-purple-600 border-purple-200" : "bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200"
             )}
-            title="游戏速度"
+            title={t.speed}
         >
             {speed === 'NORMAL' && <span className="text-lg font-black font-mono">1x</span>}
             {speed === 'FAST' && <FastForward size={24} fill="currentColor" className="opacity-80" />}
             {speed === 'INSANE' && <Zap size={24} fill="currentColor" />}
-            <span className="text-[10px] font-bold mt-0.5 md:mt-1">速度</span>
+            <span className="text-[10px] font-bold mt-0.5 md:mt-1">{t.speed}</span>
         </button>
       </div>
       
       <div className="text-center text-[10px] md:text-xs text-gray-500 font-medium hidden md:block">
-         提示: 地图上会随机生成数字源，请利用它们！{difficulty === 'EASY' && " (简单模式已隐藏乘除法)"}
+         {t.controls_hint}{difficulty === 'EASY' && t.easy_mode_hidden}
       </div>
     </div>
   );
