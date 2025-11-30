@@ -42,10 +42,6 @@ const calculateTarget = (nums: number[], difficulty: Difficulty): number => {
   // Perform random operations until we have one number or we want to stop
   // We want a target that isn't too crazy.
   
-  const ops = difficulty === 'EASY' 
-    ? ['+', '+', '-', '-'] // Weight towards add/sub
-    : ['+', '-', '*', '/'];
-
   // Try to combine at least a few times
   const steps = Math.max(1, Math.floor(current.length / 2) + 1);
 
@@ -63,7 +59,19 @@ const calculateTarget = (nums: number[], difficulty: Difficulty): number => {
     // Remove them
     current = current.filter((_, idx) => idx !== idx1 && idx !== idx2);
     
-    const op = ops[Math.floor(Math.random() * ops.length)];
+    let op = '+';
+    if (difficulty === 'HARD') {
+      if (Math.random() < 0.3) { // 30% chance for division
+        op = '/';
+      } else {
+        const others = ['+', '-', '*'];
+        op = others[Math.floor(Math.random() * others.length)];
+      }
+    } else {
+      const ops = ['+', '+', '-', '-']; // Weight towards add/sub
+      op = ops[Math.floor(Math.random() * ops.length)];
+    }
+    
     let res = a + b;
     
     if (op === '+') res = a + b;

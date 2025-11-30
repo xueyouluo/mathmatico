@@ -66,5 +66,5 @@ export interface GameState {
 // Determine grid size based on screen size
 const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-export const GRID_WIDTH = isMobile ? 10 : 16;
-export const GRID_HEIGHT = isMobile ? 14 : 10;
+export const GRID_WIDTH = isMobile ? 11 : 18;
+export const GRID_HEIGHT = isMobile ? 16 : 12;
