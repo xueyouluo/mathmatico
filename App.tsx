@@ -10,8 +10,10 @@ import clsx from 'clsx';
 import TutorialDemo from './components/TutorialDemo';
 import { solveLevel } from './utils/solver';
 import { Language, detectLanguage, translations } from './utils/i18n';
+import LoadingScreen from './components/LoadingScreen';
 
 const App: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
   const [lang, setLang] = useState<Language>(() => {
       const saved = localStorage.getItem('mathmatico_lang');
       if (saved === 'zh' || saved === 'en') return saved;
@@ -140,6 +142,8 @@ const App: React.FC = () => {
 
   // Scale Calculation Logic
   useEffect(() => {
+    if (isLoading) return;
+
     const handleResize = () => {
       if (!gameAreaRef.current) return;
       
@@ -174,12 +178,18 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('resize', handleResize);
-    handleResize(); // Initial calc
+    
+    // Initial calc
+    handleResize();
+    
     // Recalculate after a short delay to ensure layout is stable
-    setTimeout(handleResize, 100);
+    const timer = setTimeout(handleResize, 100);
 
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    return () => {
+        window.removeEventListener('resize', handleResize);
+        clearTimeout(timer);
+    };
+  }, [isLoading]);
 
   // Touch Handlers for Mobile Dragging
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -612,6 +622,10 @@ const App: React.FC = () => {
       setTutorialStep(prev => prev - 1);
     }
   };
+
+  if (isLoading) {
+    return <LoadingScreen onComplete={() => setIsLoading(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-blue-50 flex flex-col items-center font-sans text-gray-800 select-none overflow-hidden relative">
