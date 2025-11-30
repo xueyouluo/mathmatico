@@ -1,20 +1,70 @@
+# Mathmatico 🧮🏭
+
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <!-- Replace this URL with your actual banner or screenshot -->
+  <img src="public/favicon.svg" width="120" height="120" alt="Logo"/>
+  <h1>Mathmatico</h1>
+  <p><strong>Factorio meets Arithmetic.</strong></p>
+  <p>Build factories, automate math, and solve logic puzzles in your browser.</p>
+
+  [Play Now](https://mathmatico.followllm.online/) • [Report Bug](https://github.com/xueyouluo/mathmatico/issues)
+
+  <br />
+  
+  <!-- Badges -->
+  <img src="https://img.shields.io/badge/Status-Beta-blue" alt="Status" />
+  <img src="https://img.shields.io/badge/Stack-React_19_Top_Tier-61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </div>
 
-# Run and deploy your AI Studio app
+## 🎮 What is Mathmatico?
 
-This contains everything you need to run your app locally.
+**Mathmatico** is a puzzle game about building number-processing factories. Your goal is to take raw numbers, transport them on belts, and process them through mathematical machines (Adders, Multipliers, etc.) to synthesize specific target numbers.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1SrArNUYLiTUDETxUaLHTbb9i5v88-sNP
+It combines the satisfaction of **automation games** (like *Factorio*, *Shapez.io*) with the logic of **arithmetic puzzles**.
 
-## Run Locally
+### Key Features
+*   **🏭 Automation Mechanics**: Conveyor belts, extractors, and processing units.
+*   **🧮 Math Logic**: Use Adders, Subtractors, Multipliers, and Dividers to transform numbers.
+*   **🧩 Infinite Levels**: Procedurally generated challenges that get harder as you progress.
+*   **📱 Mobile Friendly**: Fully responsive touch controls for playing on the go.
+*   **🌏 Bilingual**: Native support for English and Chinese (中文).
 
-**Prerequisites:**  Node.js
+## 🕹️ How to Play
 
+1.  **Extract**: Numbers spawn from **Extractors**.
+2.  **Transport**: Place **Belts** to move numbers around the grid.
+3.  **Process**: Route two numbers into a **Math Machine** (e.g., `2` + `3` into an Adder) to create a new number (`5`).
+4.  **Deliver**: Send the target number into the central **HUB** to win!
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🛠️ Tech Stack
+
+Built with modern web technologies for high performance:
+*   **Core**: React 19, TypeScript
+*   **Build Tool**: Vite
+*   **Styling**: Tailwind CSS
+*   **Icons**: Lucide React
+*   **State**: React Hooks (Custom Game Loop)
+
+## 🚀 Running Locally
+
+If you want to contribute or run your own instance:
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/xueyouluo/mathmatico.git
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the dev server
+npm run dev
+```
+
+## 🤝 Contributing
+
+Issues and Pull Requests are welcome! If you have ideas for new buildings (e.g., "Splitters" or "Filters"), feel free to open a discussion.
+
+## 📄 License
+
+MIT License.
