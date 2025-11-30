@@ -1,4 +1,3 @@
-
 import { BuildingType, LevelConfig, Difficulty } from './types';
 
 export const COLORS = {
@@ -31,95 +30,184 @@ export const BUILDING_LABELS: Record<string, string> = {
   [BuildingType.SUBTRACTOR]: '减法器 (-)',
   [BuildingType.MULTIPLIER]: '乘法器 (×)',
   [BuildingType.DIVIDER]: '除法器 (÷)',
-  [BuildingType.TRASH]: '垃圾桶 (移除)', // Changed from '虚空 (移除)'
+  [BuildingType.TRASH]: '垃圾桶 (移除)',
 };
 
 export const TICK_RATE_MS = 600; // Speed of the game
 
-// Helper to simulate operations for level generation
-const calculateTarget = (nums: number[], difficulty: Difficulty): number => {
-  let current = [...nums];
-  // Perform random operations until we have one number or we want to stop
-  // We want a target that isn't too crazy.
-  
-  // Try to combine at least a few times
-  const steps = Math.max(1, Math.floor(current.length / 2) + 1);
+/**
+ * Smart Decompose Logic
+ * Recursively decomposes a target number into source numbers based on available operations and depth.
+ */
+const decomposeSmart = (val: number, depthRemaining: number, availableOps: string[]): number[] => {
+  if (val <= 2 || depthRemaining <= 0) {
+    return [val];
+  }
 
-  for (let i = 0; i < steps; i++) {
-    if (current.length < 2) break;
-    
-    // Pick two random indices
-    const idx1 = Math.floor(Math.random() * current.length);
-    let idx2 = Math.floor(Math.random() * current.length);
-    while (idx1 === idx2) idx2 = Math.floor(Math.random() * current.length);
-    
-    const a = current[idx1];
-    const b = current[idx2];
-    
-    // Remove them
-    current = current.filter((_, idx) => idx !== idx1 && idx !== idx2);
-    
-    let op = '+';
-    if (difficulty === 'HARD') {
-      if (Math.random() < 0.3) { // 30% chance for division
-        op = '/';
-      } else {
-        const others = ['+', '-', '*'];
-        op = others[Math.floor(Math.random() * others.length)];
-      }
-    } else {
-      const ops = ['+', '+', '-', '-']; // Weight towards add/sub
-      op = ops[Math.floor(Math.random() * ops.length)];
-    }
-    
-    let res = a + b;
-    
-    if (op === '+') res = a + b;
-    else if (op === '-') res = Math.abs(a - b); // Keep positive for target
-    else if (op === '*') res = a * b;
-    else if (op === '/') {
-       // Only divide if clean division
-       if (b !== 0 && a % b === 0) res = a / b;
-       else if (a !== 0 && b % a === 0) res = b / a;
-       else res = a + b; // Fallback to add
-    }
-    
-    // Cap target size to prevent insanity
-    if (res > 999) res = 999;
-    
-    current.push(res);
+  // Choose allowed operations based on depth to control complexity
+  // If depth is high, prefer simpler operations (add/sub) to keep numbers manageable
+  let ops = availableOps;
+  if (depthRemaining > 2) {
+    ops = availableOps.filter(op => ['+', '-'].includes(op));
+    if (ops.length === 0) ops = ['+']; // Fallback
   }
   
-  return current[0]; // The result is one of the remaining numbers (usually just one left if we combined all, but partial combine is ok too)
+  const op = ops[Math.floor(Math.random() * ops.length)];
+
+  if (op === '+') {
+    // Decompose into two roughly balanced numbers
+    // val = a + b
+    const splitPoint = Math.floor(val * (0.3 + Math.random() * 0.4)); // 0.3 to 0.7
+    const a = Math.max(1, splitPoint);
+    const b = val - a;
+    return [
+      ...decomposeSmart(a, depthRemaining - 1, availableOps),
+      ...decomposeSmart(b, depthRemaining - 1, availableOps)
+    ];
+  } 
+  else if (op === '-') {
+    // val = a - b => a = val + b
+    const b = Math.floor(Math.random() * Math.min(20, val)) + 1;
+    const a = val + b;
+    if (a > 999) {
+      // Too big, retry current level without reducing depth effectively (or fallback)
+      return decomposeSmart(val, depthRemaining, availableOps);
+    }
+    // Since this is reverse logic, we return the inputs required for the operation.
+    // To get 'val' via subtraction, we need 'a' and 'b'.
+    // But wait, this function returns the SOURCES. 
+    // If the step was "val came from a - b", then we need to find sources for a and b.
+    // However, the recursion applies to the inputs. 
+    // If we stop here, we return [a, b].
+    // If we recurse, we decompose a and b further.
+    // Note: 'b' is usually small, maybe don't decompose 'b' further if it's small.
+    
+    // Let's simplify: decrement depth.
+    // Only decompose 'a' further if it's large? For now, standard recursion.
+    return [a, b]; 
+  } 
+  else if (op === '*') {
+    // val = a * b
+    // Find factors
+    const factors: number[] = [];
+    const limit = Math.min(Math.floor(Math.sqrt(val)) + 1, 20);
+    for (let i = 2; i < limit; i++) {
+      if (val % i === 0) factors.push(i);
+    }
+    
+    if (factors.length === 0) {
+      // Prime or hard to factor, fallback to addition
+      return decomposeSmart(val, depthRemaining, ['+', '-']); 
+    }
+    
+    const a = factors[Math.floor(Math.random() * factors.length)];
+    const b = val / a;
+    return [a, b];
+  } 
+  else if (op === '/') {
+    // val = a / b => a = val * b
+    const b = Math.floor(Math.random() * 8) + 2; // 2 to 9
+    const a = val * b;
+    if (a > 999) {
+       return decomposeSmart(val, depthRemaining, availableOps);
+    }
+    return [a, b];
+  }
+
+  return [val];
 };
 
-// Dynamic Level Generator for Endless Mode
+
+// Dynamic Level Generator
 export const generateLevel = (index: number, difficulty: Difficulty = 'EASY'): LevelConfig => {
   const id = index + 1;
   
-  // 1. Generate Base Numbers (The "Deck")
-  // More numbers available as levels progress
-  const count = Math.min(6, 3 + Math.floor(index / 2));
-  const availableNumbers: number[] = [];
-  
-  for (let i = 0; i < count; i++) {
-     // Hard mode can have larger start numbers
-     const maxVal = difficulty === 'HARD' && Math.random() < 0.3 ? 50 : 9;
-     availableNumbers.push(Math.floor(Math.random() * maxVal) + 1);
+  // 1. Target Calculation (Smoother Logarithmic Growth)
+  let target: number;
+  if (difficulty === 'EASY') {
+    const base = 10;
+    // target ≈ 10 + 0.8*i + 0.1*i^1.2
+    target = Math.floor(base + index * 0.8 + Math.pow(index, 1.2) * 0.1);
+  } else { // HARD
+    const base = 20;
+    // target ≈ 20 + 1.5*i + 0.2*i^1.15
+    target = Math.floor(base + index * 1.5 + Math.pow(index, 1.15) * 0.2);
   }
 
-  // 2. Calculate a valid target from these numbers
-  // We run a simulation to ensure it's possible
-  let target = calculateTarget([...availableNumbers], difficulty);
+  // Add random fluctuation ±20%
+  const fluctuation = 0.8 + Math.random() * 0.4; // 0.8 to 1.2
+  target = Math.floor(target * fluctuation);
+  target = Math.max(5, target); // Minimum safety
+
+  // 2. Decomposition Depth (Steps)
+  // Level 1-10: 1-2 steps
+  // Level 11-30: 2-3 steps
+  // Level 30+: 3-4 steps
+  let steps: number;
+  if (id <= 10) {
+    steps = 1 + Math.floor(index / 5); 
+  } else if (id <= 30) {
+    steps = 2 + Math.floor((index - 10) / 10);
+  } else {
+    steps = Math.min(4, 3 + Math.floor((index - 30) / 20));
+  }
+
+  // 3. Available Operations
+  const availableOps = ['+'];
+  if (id > 5) availableOps.push('-');
   
-  // Edge case: if target is 0 or trivial, force a simple valid one
-  if (target <= 0) target = availableNumbers[0] + availableNumbers[1];
+  if (difficulty === 'HARD') {
+     availableOps.push('*'); 
+     availableOps.push('/'); 
+  } 
+  // EASY mode: Strictly '+' and '-' only, no multiplication or division regardless of level.
+
+  // 4. Generate Sources via Decompose
+  // We use a simplified wrapper to handle the recursive results which might be nested arrays in a real recursive function,
+  // but here we flatten logic or just iterate.
+  // Actually, the python logic was recursive. Let's try to mimic the effect iteratively or simply call the recursive function.
+  // Our decomposeSmart returns a flat array of sources? 
+  // Wait, the python code: return [*decompose(a), *decompose(b)]. Yes, it returns a flat list of leaves.
+  const sources = decomposeSmart(target, steps, availableOps);
+
+  // 5. Distractors (Noise)
+  if (difficulty === 'HARD' || id > 10) {
+    const noiseCount = Math.min(3, Math.floor((id - 10) / 10) + 1);
+    
+    for (let i = 0; i < noiseCount; i++) {
+      const ref = sources[Math.floor(Math.random() * sources.length)];
+      let noise = ref;
+      
+      if (Math.random() < 0.5) {
+         // Option 1: Close number
+         noise = ref + Math.floor(Math.random() * 11) - 5; // -5 to +5
+      } else {
+         // Option 2: Fake operation result
+         if (sources.length >= 2) {
+            const a = sources[Math.floor(Math.random() * sources.length)];
+            const b = sources[Math.floor(Math.random() * sources.length)];
+            noise = a + b + Math.floor(Math.random() * 3) + 1; // a + b + error
+         } else {
+            noise = ref + 5;
+         }
+      }
+      
+      noise = Math.max(1, noise);
+      sources.push(noise);
+    }
+  }
+
+  // Shuffle
+  for (let i = sources.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [sources[i], sources[j]] = [sources[j], sources[i]];
+  }
 
   return {
     id,
     name: id <= 10 ? `第 ${id} 关` : `无尽模式 ${id}`,
     target,
     description: `目标数字: ${target}。`,
-    availableNumbers,
+    availableNumbers: sources,
   };
 };

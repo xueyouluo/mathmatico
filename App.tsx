@@ -1,34 +1,61 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GridCell from './components/GridCell';
 import Controls from './components/Controls';
-import { GameState, BuildingType, Direction, GRID_WIDTH, GRID_HEIGHT, Tile, Difficulty } from './types';
+import { GameState, BuildingType, Direction, GRID_WIDTH, GRID_HEIGHT, Tile, Difficulty, GameSpeed } from './types';
 import { initializeGrid, processTick } from './utils/gameLogic';
 import { TICK_RATE_MS, generateLevel } from './constants';
-import { Trophy, HelpCircle, Play, Pause, RefreshCw, ArrowRight, Star, ChevronRight, ChevronLeft, BookOpen, BrainCircuit, Calculator, Sigma, Binary, Percent, Divide, Plus, X, Minus, Lightbulb } from 'lucide-react';
+import { Trophy, HelpCircle, Play, Pause, RefreshCw, ArrowRight, Star, ChevronRight, ChevronLeft, BookOpen, BrainCircuit, Calculator, Sigma, Binary, Percent, Divide, Plus, X, Minus, Lightbulb, Zap, FastForward, Activity } from 'lucide-react';
 import clsx from 'clsx';
 import TutorialDemo from './components/TutorialDemo';
 import { solveLevel } from './utils/solver';
 
 const App: React.FC = () => {
   // Game Configuration
-  const [difficulty, setDifficulty] = useState<Difficulty>('EASY');
-
-  // Initialize with Level 1
-  const initialLevel = generateLevel(0, difficulty);
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => {
+    try {
+      const storedDifficulty = localStorage.getItem('mathmatico_difficulty');
+      return storedDifficulty === 'HARD' ? 'HARD' : 'EASY';
+    } catch (error) {
+      console.error("Failed to load difficulty from localStorage", error);
+      return 'EASY';
+    }
+  });
+  const [speed, setSpeed] = useState<GameSpeed>('NORMAL');
 
   // Game State
-  const [gameState, setGameState] = useState<GameState>({
-    grid: initializeGrid(GRID_WIDTH, GRID_HEIGHT, 0, difficulty, initialLevel.availableNumbers),
-    score: 0,
-    levelIndex: 0,
-    currentLevel: initialLevel,
-    isLevelComplete: false,
-    tickCount: 0,
-    lastScoreIncrease: null,
+  const [gameState, setGameState] = useState<GameState>(() => {
+    let savedScore = 0;
+    let savedLevelIndex = 0;
+    try {
+      const storedScore = localStorage.getItem('mathmatico_score');
+      const storedLevelIndex = localStorage.getItem('mathmatico_levelIndex');
+      if (storedScore) savedScore = parseInt(storedScore, 10);
+      if (storedLevelIndex) savedLevelIndex = parseInt(storedLevelIndex, 10);
+    } catch (error) {
+      console.error("Failed to load game state from localStorage", error);
+    }
+
+    const initialLevelConfig = generateLevel(savedLevelIndex, difficulty);
+    
+    return {
+      grid: initializeGrid(GRID_WIDTH, GRID_HEIGHT, savedLevelIndex, difficulty, initialLevelConfig.availableNumbers),
+      score: savedScore,
+      levelIndex: savedLevelIndex,
+      currentLevel: initialLevelConfig,
+      isLevelComplete: false,
+      tickCount: 0,
+      lastScoreIncrease: null,
+    };
   });
 
   const handleHint = () => {
+    if (gameState.score < 1000) {
+      setHintContent("需要 1000 分才能查看提示！");
+      setShowHint(true);
+      return;
+    }
+
     // 1. Gather all source numbers
     const sources: number[] = [];
     gameState.grid.forEach(row => {
@@ -50,6 +77,8 @@ const App: React.FC = () => {
     
     if (solution) {
       setHintContent(solution);
+      // Deduct score
+      setGameState(prev => ({ ...prev, score: prev.score - 1000 }));
     } else {
       setHintContent("抱歉，暂未找到简单的组合解法，请尝试利用更多的数字！");
     }
@@ -59,7 +88,7 @@ const App: React.FC = () => {
   // UI State
   const [selectedBuilding, setSelectedBuilding] = useState<BuildingType>(BuildingType.BELT);
   const [selectedNumber, setSelectedNumber] = useState<number>(1);
-  const [currentDirection, setCurrentDirection] = useState<Direction>(Direction.RIGHT);
+
   const [paused, setPaused] = useState<boolean>(false);
   const [showTutorial, setShowTutorial] = useState<boolean>(true);
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -217,14 +246,16 @@ const App: React.FC = () => {
       return;
     }
 
+    const currentTickRate = speed === 'NORMAL' ? TICK_RATE_MS : (speed === 'FAST' ? TICK_RATE_MS / 2 : TICK_RATE_MS / 4);
+
     intervalRef.current = setInterval(() => {
       setGameState((prev) => processTick(prev));
-    }, TICK_RATE_MS);
+    }, currentTickRate);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [paused, gameState.isLevelComplete, showTutorial]);
+  }, [paused, gameState.isLevelComplete, showTutorial, speed]);
 
   // Animation Loop (requestAnimationFrame)
   useEffect(() => {
@@ -240,13 +271,15 @@ const App: React.FC = () => {
       const deltaTime = now - lastFrameTime; // Time elapsed since last frame
       lastFrameTime = now;
 
+      const currentTickRate = speed === 'NORMAL' ? TICK_RATE_MS : (speed === 'FAST' ? TICK_RATE_MS / 2 : TICK_RATE_MS / 4);
+
       setGameState(prevGameState => {
         let gridChanged = false;
         const newGrid = prevGameState.grid.map(row => row.map(tile => {
           if (tile.item && tile.item.animationPhase < 1) {
             // Speed up animation slightly (90% of tick rate) to ensure it finishes before next tick
             // This prevents visual "snap back" when tick updates logical position
-            const newAnimationPhase = Math.min(1, tile.item.animationPhase + (deltaTime / (TICK_RATE_MS * 0.9)));
+            const newAnimationPhase = Math.min(1, tile.item.animationPhase + (deltaTime / (currentTickRate * 0.9)));
             if (newAnimationPhase !== tile.item.animationPhase) { // Only update if phase actually changed
               gridChanged = true;
               return {
@@ -275,12 +308,11 @@ const App: React.FC = () => {
     return () => {
       cancelAnimationFrame(animationFrameId); // Clean up on unmount or dependency change
     };
-  }, [paused, gameState.isLevelComplete, showTutorial]); // Dependencies ensure loop restarts when necessary
+  }, [paused, gameState.isLevelComplete, showTutorial, speed]); // Dependencies ensure loop restarts when necessary
 
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'r') rotate();
       if (e.key === ' ') setPaused(p => !p);
     };
     const handleGlobalMouseUp = () => {
@@ -297,11 +329,46 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Effect to update level config if difficulty changes mid-game for NEW levels,
-  // but usually we might want to restart or just apply to next level.
-  // Here we just keep playing, but `nextLevel` will use the new difficulty.
+  // Timer for Hint Offer
+  const [showHintOffer, setShowHintOffer] = useState(false);
+  const startTimeRef = useRef(Date.now());
 
-  const rotate = () => setCurrentDirection((prev) => (prev + 1) % 4);
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+    setShowHintOffer(false);
+    
+    const timerInterval = setInterval(() => {
+      if (Date.now() - startTimeRef.current > 60000 && !gameState.isLevelComplete && !showHintOffer) { // 1 minute
+         setShowHintOffer(true);
+         clearInterval(timerInterval);
+      }
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [gameState.levelIndex]); // Reset on level change
+
+  // Save/Load Game Progress functions
+  const saveGameProgress = useCallback((scoreToSave: number, levelIndexToSave: number, difficultyToSave: Difficulty) => {
+    try {
+      localStorage.setItem('mathmatico_score', scoreToSave.toString());
+      localStorage.setItem('mathmatico_levelIndex', levelIndexToSave.toString());
+      localStorage.setItem('mathmatico_difficulty', difficultyToSave);
+    } catch (error) {
+      console.error("Failed to save game state to localStorage", error);
+    }
+  }, []);
+
+  const clearGameProgress = useCallback(() => {
+    try {
+      localStorage.removeItem('mathmatico_score');
+      localStorage.removeItem('mathmatico_levelIndex');
+      localStorage.removeItem('mathmatico_difficulty');
+    } catch (error) {
+      console.error("Failed to clear game state from localStorage", error);
+    }
+  }, []);
+
+
 
   const modifyTile = (grid: Tile[][], x: number, y: number, updates: Partial<Tile>): Tile[][] => {
     if (y < 0 || y >= GRID_HEIGHT || x < 0 || x >= GRID_WIDTH) return grid;
@@ -352,7 +419,7 @@ const App: React.FC = () => {
   const placeBuilding = (x: number, y: number, directionOverride?: Direction, buildingTypeOverride?: BuildingType) => {
     setGameState((prev) => {
       const building = buildingTypeOverride !== undefined ? buildingTypeOverride : selectedBuilding;
-      const dir = directionOverride !== undefined ? directionOverride : currentDirection;
+      const dir = directionOverride !== undefined ? directionOverride : Direction.RIGHT;
       // Removed Extractor logic since user can't select it
       
       const newGrid = modifyTile(prev.grid, x, y, {
@@ -458,13 +525,16 @@ const App: React.FC = () => {
     
     setGameState({
       grid: initializeGrid(GRID_WIDTH, GRID_HEIGHT, nextIndex, difficulty, nextConfig.availableNumbers),
-      score: gameState.score, // Keep score accumulator
+      score: gameState.score + 1000, // Increment score by 1000 for completing a level
       levelIndex: nextIndex,
       currentLevel: nextConfig,
       isLevelComplete: false,
       tickCount: 0,
-      lastScoreIncrease: null,
+      lastScoreIncrease: 1000, // Show the last score increase
     });
+
+    // Save progress after moving to next level
+    saveGameProgress(gameState.score + 1000, nextIndex, difficulty);
   };
 
   const resetGame = () => {
@@ -478,6 +548,9 @@ const App: React.FC = () => {
       tickCount: 0,
       lastScoreIncrease: null,
     });
+
+    // Clear saved progress on game reset
+    clearGameProgress();
   };
 
   const toggleDifficulty = (newDiff: Difficulty) => {
@@ -489,8 +562,10 @@ const App: React.FC = () => {
             ...prev, 
             currentLevel: firstLevel,
             grid: initializeGrid(GRID_WIDTH, GRID_HEIGHT, 0, newDiff, firstLevel.availableNumbers) 
-        }));
+        })); // Corrected: added `})`
     }
+    // Always save the new difficulty setting
+    saveGameProgress(gameState.score, gameState.levelIndex, newDiff);
   };
 
   const handleNextStep = () => {
@@ -559,9 +634,7 @@ const App: React.FC = () => {
             <button onClick={() => { setShowTutorial(true); setTutorialStep(0); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-500" title="帮助">
                 <BookOpen size={24} />
             </button>
-            <button onClick={handleHint} className="p-2 hover:bg-yellow-100 rounded-full text-yellow-500" title="提示">
-                <Lightbulb size={24} fill="currentColor" />
-            </button>
+
         </div>
 
         {/* Center: Targets */}
@@ -610,6 +683,16 @@ const App: React.FC = () => {
         ref={gameAreaRef}
         className="flex-1 w-full relative overflow-hidden flex items-center justify-center bg-blue-50/50"
       >
+        {/* Floating Hint Button */}
+        <button 
+            onClick={handleHint}
+            className="absolute top-4 right-4 z-20 bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all transform hover:scale-105 active:scale-95 border-2 border-yellow-300 animate-bounce-subtle"
+            title="消耗 1000 分获取提示"
+        >
+            <Lightbulb size={20} fill="currentColor" />
+            <span>提示 (-1000)</span>
+        </button>
+
         {/* Grid Wrapper with Dynamic Scale */}
         {/* Explicit size ensures layout is compact */}
         <div 
@@ -670,11 +753,45 @@ const App: React.FC = () => {
               onSelect={setSelectedBuilding}
               selectedNumber={selectedNumber}
               onSelectNumber={setSelectedNumber}
-              onRotate={rotate}
               difficulty={difficulty}
+              speed={speed}
+              onToggleSpeed={() => setSpeed(s => s === 'NORMAL' ? 'FAST' : s === 'FAST' ? 'INSANE' : 'NORMAL')}
             />
          </div>
       </div>
+
+      {/* Hint Offer Modal (Timer Triggered) */}
+      {showHintOffer && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowHintOffer(false)}>
+          <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full flex flex-col items-center text-center relative overflow-hidden border-4 border-blue-200 transform animate-in zoom-in-95 duration-200 mx-4" onClick={e => e.stopPropagation()}>
+            
+            <div className="bg-blue-100 p-4 rounded-full text-blue-500 mb-4 shadow-inner">
+               <HelpCircle size={48} />
+            </div>
+            
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">遇到困难了吗？</h2>
+            <p className="text-gray-500 text-sm mb-6">您已经思考了一段时间。是否需要消耗 <span className="font-bold text-red-500">1000</span> 分来获取一步关键提示？</p>
+
+            <div className="flex gap-3 w-full">
+                <button 
+                  onClick={() => setShowHintOffer(false)}
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl font-bold transition-all"
+                >
+                  不需要
+                </button>
+                <button 
+                  onClick={() => {
+                      setShowHintOffer(false);
+                      handleHint();
+                  }}
+                  className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-1"
+                >
+                  <Lightbulb size={18} fill="currentColor" /> 获取提示
+                </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hint Modal */}
       {showHint && (

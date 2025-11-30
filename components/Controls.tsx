@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { BuildingType, Difficulty } from '../types';
-import { ArrowUp, Plus, Minus, X, Divide, RotateCw, Eraser, ChevronsUp } from 'lucide-react';
+import { BuildingType, Difficulty, GameSpeed } from '../types';
+import { ArrowUp, Plus, Minus, X, Divide, Eraser, ChevronsUp, Zap, FastForward } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ControlsProps {
@@ -9,11 +9,12 @@ interface ControlsProps {
   onSelect: (b: BuildingType) => void;
   selectedNumber: number;
   onSelectNumber: (n: number) => void;
-  onRotate: () => void;
   difficulty: Difficulty;
+  speed: GameSpeed;
+  onToggleSpeed: () => void;
 }
 
-const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selectedNumber, onSelectNumber, onRotate, difficulty }) => {
+const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selectedNumber, onSelectNumber, difficulty, speed, onToggleSpeed }) => {
   
   // Removed EXTRACTOR from available buttons
   let buttons = [
@@ -54,12 +55,17 @@ const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selecte
         <div className="w-px bg-gray-300 mx-1 h-10 md:h-12 self-center shrink-0"></div>
 
         <button
-          onClick={onRotate}
-          className="flex flex-col items-center justify-center min-w-[3.5rem] w-14 h-14 md:w-16 md:h-16 rounded-xl bg-indigo-100 text-indigo-600 border-2 border-transparent hover:border-indigo-300 transition-all active:scale-95 snap-center shrink-0"
-          title="旋转 (R)"
+            onClick={onToggleSpeed}
+            className={clsx(
+              "flex flex-col items-center justify-center min-w-[3.5rem] w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 transition-all snap-center shrink-0",
+              speed === 'INSANE' ? "bg-purple-100 text-purple-600 border-purple-200" : "bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200"
+            )}
+            title="游戏速度"
         >
-          <RotateCw size={24} />
-          <span className="text-[10px] font-bold mt-0.5 md:mt-1">旋转</span>
+            {speed === 'NORMAL' && <span className="text-lg font-black font-mono">1x</span>}
+            {speed === 'FAST' && <FastForward size={24} fill="currentColor" className="opacity-80" />}
+            {speed === 'INSANE' && <Zap size={24} fill="currentColor" />}
+            <span className="text-[10px] font-bold mt-0.5 md:mt-1">速度</span>
         </button>
       </div>
       

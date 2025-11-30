@@ -19,6 +19,7 @@ export enum BuildingType {
 }
 
 export type Difficulty = 'EASY' | 'HARD';
+export type GameSpeed = 'NORMAL' | 'FAST' | 'INSANE';
 
 export interface Item {
   id: string;
