@@ -188,68 +188,59 @@ export const processTick = (currentState: GameState): GameState => {
 
       // Processors
       if ([BuildingType.ADDER, BuildingType.SUBTRACTOR, BuildingType.MULTIPLIER, BuildingType.DIVIDER].includes(currentTile.building)) {
+        
+        // Logic for Direction Locking (All Processors now)
+        // If we have a pair and no lock, we lock the first one as the "Main" (Left) input.
+        if (nextTile.fixedInputDir === undefined && nextTile.storedItems.length >= 2) {
+             // Lock it!
+             nextTile.fixedInputDir = nextTile.storedItems[0].fromDir;
+        }
+
         if (nextTile.storedItems.length >= 2) {
           if (!nextTile.item) {
-            let indexA = -1;
-            let indexB = -1;
-            let result = 0;
-            let found = false;
-
-            // Logic for Directional Operations (SUBTRACTOR, DIVIDER)
-            if (currentTile.building === BuildingType.SUBTRACTOR || currentTile.building === BuildingType.DIVIDER) {
-               const backDir = (currentTile.direction + 2) % 4;
-               
-               // Find one Main Input (from Back)
-               const mainIndex = nextTile.storedItems.findIndex(slot => slot.fromDir === backDir);
-               
-               if (mainIndex !== -1) {
-                 // Find one Side Input (not from Back)
-                 const sideIndex = nextTile.storedItems.findIndex((slot, idx) => idx !== mainIndex && slot.fromDir !== backDir);
-                 
-                 if (sideIndex !== -1) {
-                    indexA = mainIndex;
-                    indexB = sideIndex;
-                    found = true;
-
-                    const valA = nextTile.storedItems[indexA].item.value;
-                    const valB = nextTile.storedItems[indexB].item.value;
-
-                    if (currentTile.building === BuildingType.SUBTRACTOR) {
-                        result = valA - valB;
-                    } else { // DIVIDER
-                        result = valB !== 0 ? Math.floor(valA / valB) : 0;
-                    }
-                 }
-               }
+            
+            let valA, valB;
+            
+            if (nextTile.fixedInputDir !== undefined) { // Now applies to all processors if locked
+                // Use Locked Directions
+                const itemA = nextTile.storedItems.find(i => i.fromDir === nextTile.fixedInputDir);
+                const itemB = nextTile.storedItems.find(i => i.fromDir !== nextTile.fixedInputDir);
+                
+                if (itemA && itemB) {
+                    valA = itemA.item.value;
+                    valB = itemB.item.value;
+                } else {
+                    // Fallback to FIFO if locked items are missing (e.g. one input stream dried up)
+                    valA = nextTile.storedItems[0].item.value;
+                    valB = nextTile.storedItems[1].item.value;
+                }
             } else {
-               // Commutative Operations (ADDER, MULTIPLIER) - Take any two
-               if (nextTile.storedItems.length >= 2) {
-                  indexA = 0;
-                  indexB = 1;
-                  found = true;
-                  
-                  const valA = nextTile.storedItems[0].item.value;
-                  const valB = nextTile.storedItems[1].item.value;
-                  
-                  if (currentTile.building === BuildingType.ADDER) {
-                     result = valA + valB;
-                  } else {
-                     result = valA * valB;
-                  }
-               }
+                // Standard FIFO (if fixedInputDir is not yet set)
+                valA = nextTile.storedItems[0].item.value;
+                valB = nextTile.storedItems[1].item.value;
             }
 
-            if (found) {
-                // Sort indices to splice correctly (largest first)
-                const indices = [indexA, indexB].sort((a, b) => b - a);
-                nextTile.storedItems.splice(indices[0], 1);
-                nextTile.storedItems.splice(indices[1], 1);
+            let result = 0;
 
-                if (result > 999) result = 999;
-                if (result < -999) result = -999;
-
-                nextTile.item = createItem(result, x, y); // New item created at processor's location
+            if (currentTile.building === BuildingType.ADDER) {
+                result = valA + valB;
+            } else if (currentTile.building === BuildingType.SUBTRACTOR) {
+                result = valA - valB;
+            } else if (currentTile.building === BuildingType.MULTIPLIER) {
+                result = valA * valB;
+            } else if (currentTile.building === BuildingType.DIVIDER) {
+                result = valB !== 0 ? Math.floor(valA / valB) : 0;
             }
+
+            // Consume first two items
+            // Note: If using locked dirs, we should remove the specific items used.
+            // But since we only hold 2 items max, clearing 0 and 1 is fine.
+            nextTile.storedItems.splice(0, 2);
+
+            if (result > 999) result = 999;
+            if (result < -999) result = -999;
+
+            nextTile.item = createItem(result, x, y); // New item created at processor's location
           }
         }
       }
@@ -266,16 +257,58 @@ export const processTick = (currentState: GameState): GameState => {
   // 2. Movement Logic
   // Collect all moves first to prevent issues with concurrent mutation
   const itemMoves: { item: Item; fromX: number; fromY: number; toX: number; toY: number; fromDir?: Direction }[] = [];
+  const processorEntries: { item: Item; fromX: number; fromY: number; toX: number; toY: number; fromDir: Direction }[] = [];
 
   for (let y = 0; y < GRID_HEIGHT; y++) {
     for (let x = 0; x < GRID_WIDTH; x++) {
       const tile = nextGrid[y][x]; // Current state of nextGrid, potentially with newly created items
       
       if (tile.item) {
-        const nextCoords = getNextCoords(x, y, tile.direction);
+        let targetCoords = null;
+        let effectiveDirection = tile.direction;
+
+        if (tile.building === BuildingType.EXTRACTOR) {
+           // Special multi-output logic for Extractor
+           const candidates: { coords: {x: number, y: number}, dir: Direction }[] = [];
+           
+           [Direction.UP, Direction.RIGHT, Direction.DOWN, Direction.LEFT].forEach(dir => {
+               const coords = getNextCoords(x, y, dir);
+               if (coords) {
+                   const neighbor = getTile(coords.x, coords.y);
+                   // Valid if neighbor exists and is a BELT (or the explicit target direction)
+                   // AND neighbor is not pointing BACK at us (to prevent immediate back-flow if belt is wrong way)
+                   if (neighbor) {
+                      // Condition 1: It is the explicit direction (user connected directly to machine?)
+                      // Condition 2: It is a BELT.
+                      // Additional Check: If it's a belt, it should ideally not be pointing AT the extractor.
+                      // (neighbor.direction + 2) % 4 !== dir
+                      
+                      const isExplicitTarget = dir === tile.direction;
+                      const isBelt = neighbor.building === BuildingType.BELT;
+                      
+                      if (isExplicitTarget || isBelt) {
+                          candidates.push({ coords, dir });
+                      }
+                   }
+               }
+           });
+
+           if (candidates.length > 0) {
+               // Deterministic Round Robin based on global tick count
+               // This ensures even distribution if multiple outputs exist
+               const selected = candidates[currentState.tickCount % candidates.length];
+               targetCoords = selected.coords;
+               effectiveDirection = selected.dir;
+           }
+
+        } else {
+           // Standard behavior for Belts/Machines
+           targetCoords = getNextCoords(x, y, tile.direction);
+           effectiveDirection = tile.direction;
+        }
         
-        if (nextCoords) {
-          const targetTile = getTile(nextCoords.x, nextCoords.y);
+        if (targetCoords) {
+          const targetTile = getTile(targetCoords.x, targetCoords.y);
           
           if (targetTile) {
             // STRICTLY prevent moving to empty tiles (NONE).
@@ -301,32 +334,18 @@ export const processTick = (currentState: GameState): GameState => {
 
             // Processors store items
             if ([BuildingType.ADDER, BuildingType.SUBTRACTOR, BuildingType.MULTIPLIER, BuildingType.DIVIDER].includes(targetTile.building)) {
-               const fromDir = (tile.direction + 2) % 4; // Item entered target from this direction
+               const fromDir = (effectiveDirection + 2) % 4; // Item entered target from this direction
                
-               // Advanced Capacity Check to prevent jamming
-               // For Subtractor/Divider, we must ensure one type of input doesn't fill all slots.
-               let canAccept = false;
-               
-               if (targetTile.building === BuildingType.SUBTRACTOR || targetTile.building === BuildingType.DIVIDER) {
-                   const backDir = (targetTile.direction + 2) % 4;
-                   const isMainInput = fromDir === backDir;
-                   
-                   // Count existing items of this type
-                   const count = targetTile.storedItems.filter(slot => 
-                       isMainInput ? slot.fromDir === backDir : slot.fromDir !== backDir
-                   ).length;
-                   
-                   // Limit each channel to 2 items max
-                   if (count < 2) canAccept = true;
-               } else {
-                   // For Adder/Multiplier (commutative), just check total capacity
-                   if (targetTile.storedItems.length < 4) canAccept = true;
-               }
-
-               if (canAccept) {
-                  targetTile.storedItems.push({ item: tile.item, fromDir });
-                  tile.item = undefined; // Item leaves source tile
-               }
+               // Defer processing to handle synchronization logic
+               processorEntries.push({
+                   item: tile.item,
+                   fromX: x,
+                   fromY: y,
+                   toX: targetCoords.x,
+                   toY: targetCoords.y,
+                   fromDir
+               });
+               tile.item = undefined; // Optimistically remove
                continue;
             }
 
@@ -338,8 +357,8 @@ export const processTick = (currentState: GameState): GameState => {
                     item: tile.item,
                     fromX: x,
                     fromY: y,
-                    toX: nextCoords.x,
-                    toY: nextCoords.y,
+                    toX: targetCoords.x,
+                    toY: targetCoords.y,
                 });
                 tile.item = undefined; // Item leaves source tile
             }
@@ -349,7 +368,62 @@ export const processTick = (currentState: GameState): GameState => {
     }
   }
 
-  // Apply all recorded moves after all tiles have been processed for origin items
+  // 3. Handle Processor Entries (Synchronization Logic)
+  // Group entries by target tile
+  const entriesByTarget = new Map<string, typeof processorEntries>();
+  processorEntries.forEach(entry => {
+      const key = `${entry.toX},${entry.toY}`;
+      if (!entriesByTarget.has(key)) entriesByTarget.set(key, []);
+      entriesByTarget.get(key)!.push(entry);
+  });
+
+  entriesByTarget.forEach((entries, key) => {
+      const [tx, ty] = key.split(',').map(Number);
+      const targetTile = nextGrid[ty][tx];
+      
+      // Check Constraints
+      const acceptedEntries: typeof processorEntries = [];
+      
+      // All processors now require distinct input directions
+      const usedDirs = new Set(targetTile.storedItems.map(i => i.fromDir));
+      let slotsAvailable = 2 - targetTile.storedItems.length;
+      
+      for (const entry of entries) {
+          if (slotsAvailable <= 0) break;
+          
+          if (!usedDirs.has(entry.fromDir)) {
+              acceptedEntries.push(entry);
+              usedDirs.add(entry.fromDir);
+              slotsAvailable--;
+          }
+          // If dir is already used, we skip/reject this entry
+      }
+
+      // Process Accepted Entries
+      acceptedEntries.forEach(entry => {
+          targetTile.storedItems.push({ item: entry.item, fromDir: entry.fromDir });
+      });
+      
+      // Reject Remaining Entries (either capacity full or dir conflict)
+      // Any entry in `entries` that is NOT in `acceptedEntries` must be bounced
+      const acceptedSet = new Set(acceptedEntries);
+      entries.forEach(entry => {
+          if (!acceptedSet.has(entry)) {
+              const sourceTile = getTile(entry.fromX, entry.fromY);
+              if (sourceTile) {
+                  // Restore item to source
+                  entry.item.x = entry.fromX;
+                  entry.item.y = entry.fromY;
+                  entry.item.lastX = entry.fromX;
+                  entry.item.lastY = entry.fromY;
+                  entry.item.animationPhase = 1; // Reset animation
+                  sourceTile.item = entry.item;
+              }
+          }
+      });
+  });
+
+  // 4. Apply Belt Moves
   itemMoves.forEach(({ item, fromX, fromY, toX, toY }) => {
     const targetTile = getTile(toX, toY);
     if (targetTile && !targetTile.item) { // Ensure target is still empty after other moves

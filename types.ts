@@ -42,6 +42,7 @@ export interface Tile {
   extractorValue?: number; // For EXTRACTOR (1-9)
   item?: Item; // Item currently on the belt/tile
   storedItems: { item: Item; fromDir: Direction }[]; // For processors waiting for 2nd input
+  fixedInputDir?: Direction; // Locks the direction for the first operand (Left side)
 }
 
 export interface LevelConfig {
@@ -65,5 +66,5 @@ export interface GameState {
 // Determine grid size based on screen size
 const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
-export const GRID_WIDTH = isMobile ? 9 : 12;
-export const GRID_HEIGHT = isMobile ? 12 : 8;
+export const GRID_WIDTH = isMobile ? 10 : 16;
+export const GRID_HEIGHT = isMobile ? 14 : 10;

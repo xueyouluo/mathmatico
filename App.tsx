@@ -73,6 +73,7 @@ const App: React.FC = () => {
   const [isRightDragging, setIsRightDragging] = useState(false);
   const lastDragPos = useRef<{x: number, y: number} | null>(null);
   const dragStartPixelPos = useRef<{x: number, y: number} | null>(null); // For touch deadzone
+  const isDragOutFromExtractor = useRef(false);
 
   // Mobile / Responsive State
   const [scale, setScale] = useState(1);
@@ -147,7 +148,13 @@ const App: React.FC = () => {
                dragStartPixelPos.current = { x: touch.clientX, y: touch.clientY };
                
                // Execute Interact immediately (Tap logic)
-               handleInteract(x, y);
+               // Check for Extractor drag-out start
+               if (gameState.grid[y][x].building === BuildingType.EXTRACTOR) {
+                   isDragOutFromExtractor.current = true;
+               } else {
+                   isDragOutFromExtractor.current = false;
+                   handleInteract(x, y);
+               }
            } else {
                // Frame 2+: Continuation
                if (dragStartPixelPos.current) {
@@ -171,6 +178,7 @@ const App: React.FC = () => {
      setIsRightDragging(false);
      lastDragPos.current = null;
      dragStartPixelPos.current = null;
+     isDragOutFromExtractor.current = false;
   };
 
   // Tutorial Steps
@@ -187,7 +195,7 @@ const App: React.FC = () => {
     },
     {
       title: "运算机器",
-      content: "机器需要两个输入。注意箭头方向：对于减法和除法，【后方输入】（箭头反方向）是被减数/被除数，【侧面输入】是减数/除数。结果沿箭头输出。",
+      content: "机器需要两个输入。对于减法和除法，【先到达】的数字是被减数/被除数（左边），【后到达】的是减数/除数（右边）。结果沿箭头输出。",
       demo: <TutorialDemo type="math" />
     },
     {
@@ -279,6 +287,7 @@ const App: React.FC = () => {
       setIsDragging(false);
       setIsRightDragging(false);
       lastDragPos.current = null;
+      isDragOutFromExtractor.current = false;
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('mouseup', handleGlobalMouseUp);
@@ -297,12 +306,33 @@ const App: React.FC = () => {
   const modifyTile = (grid: Tile[][], x: number, y: number, updates: Partial<Tile>): Tile[][] => {
     if (y < 0 || y >= GRID_HEIGHT || x < 0 || x >= GRID_WIDTH) return grid;
     
-    // Prevent overwriting Hub or Extractor (Source)
-    const existing = grid[y][x];
-    if (existing.building === BuildingType.HUB || existing.building === BuildingType.EXTRACTOR) return grid;
+        const existing = grid[y][x];
+        
+        // 1. Strictly Protected: HUB, EXTRACTOR
+        // Cannot be overwritten OR erased.
+        if (existing.building === BuildingType.HUB || existing.building === BuildingType.EXTRACTOR) {
+             if (updates.building !== undefined && updates.building !== existing.building) {
+                 return grid;
+             }
+        }
     
-    const newGrid = [...grid];
-    newGrid[y] = [...newGrid[y]];
+        // 2. Protected from Overwrite: Processors
+        // Cannot be overwritten by placing another building on top (except Eraser).
+        const overwriteProtected = [
+          BuildingType.ADDER, 
+          BuildingType.SUBTRACTOR, 
+          BuildingType.MULTIPLIER, 
+          BuildingType.DIVIDER,
+        ];
+    
+        if (overwriteProtected.includes(existing.building) 
+            && updates.building !== undefined 
+            && updates.building !== existing.building
+            && updates.building !== BuildingType.NONE) {
+            return grid;
+        }
+        
+        const newGrid = [...grid];    newGrid[y] = [...newGrid[y]];
     newGrid[y][x] = { ...newGrid[y][x], ...updates };
     return newGrid;
   };
@@ -319,9 +349,9 @@ const App: React.FC = () => {
     });
   };
 
-  const placeBuilding = (x: number, y: number, directionOverride?: Direction) => {
+  const placeBuilding = (x: number, y: number, directionOverride?: Direction, buildingTypeOverride?: BuildingType) => {
     setGameState((prev) => {
-      const building = selectedBuilding;
+      const building = buildingTypeOverride !== undefined ? buildingTypeOverride : selectedBuilding;
       const dir = directionOverride !== undefined ? directionOverride : currentDirection;
       // Removed Extractor logic since user can't select it
       
@@ -357,7 +387,18 @@ const App: React.FC = () => {
     if (e.button === 0) {
       setIsDragging(true);
       lastDragPos.current = { x, y };
-      handleInteract(x, y);
+      
+      // If starting drag on an Extractor or Processor, engage "Belt Drag-Out" mode
+      // UNLESS we are using the Eraser!
+      const startTile = gameState.grid[y][x];
+      const isProcessor = [BuildingType.ADDER, BuildingType.SUBTRACTOR, BuildingType.MULTIPLIER, BuildingType.DIVIDER].includes(startTile.building);
+      
+      if ((startTile.building === BuildingType.EXTRACTOR || isProcessor) && selectedBuilding !== BuildingType.NONE) {
+          isDragOutFromExtractor.current = true;
+      } else {
+          isDragOutFromExtractor.current = false;
+          handleInteract(x, y);
+      }
     } else if (e.button === 2) {
       setIsRightDragging(true);
       eraseBuilding(x, y);
@@ -367,34 +408,46 @@ const App: React.FC = () => {
   const handleMouseEnter = (x: number, y: number) => {
     if (isRightDragging) { eraseBuilding(x, y); return; }
     if (!isDragging) return;
+
+    // Determine effective tool
+    // If dragging out from extractor/machine, strictly use BELT regardless of selected tool
+    const effectiveBuildingType = isDragOutFromExtractor.current ? BuildingType.BELT : selectedBuilding;
+
+    // Eraser Tool Logic (Left-click drag to erase)
+    if (effectiveBuildingType === BuildingType.NONE) {
+      eraseBuilding(x, y);
+      return;
+    }
+
+    // Only allow drag-painting for Belts
+    if (effectiveBuildingType !== BuildingType.BELT) return;
+
     const prevPos = lastDragPos.current;
     if (!prevPos || (prevPos.x === x && prevPos.y === y)) return;
 
     const dx = x - prevPos.x;
     const dy = y - prevPos.y;
-    if (Math.abs(dx) + Math.abs(dy) !== 1) {
-       lastDragPos.current = { x, y }; 
-       // For drag enter, we usually just place (overwrite), unless we want smart drag-rotate logic.
-       // Current logic was: placeBuilding(x, y);
-       // Let's keep simple placement for drag entry to avoid flickering rotations.
-       placeBuilding(x, y); 
-       return;
+    
+    // Determine drag direction if adjacent
+    let dragDir: Direction | undefined;
+    if (Math.abs(dx) + Math.abs(dy) === 1) {
+       if (dy === -1) dragDir = Direction.UP;
+       if (dy === 1) dragDir = Direction.DOWN;
+       if (dx === -1) dragDir = Direction.LEFT;
+       if (dx === 1) dragDir = Direction.RIGHT;
     }
 
-    let dragDir: Direction = Direction.RIGHT;
-    if (dy === -1) dragDir = Direction.UP;
-    if (dy === 1) dragDir = Direction.DOWN;
-    if (dx === -1) dragDir = Direction.LEFT;
-    if (dx === 1) dragDir = Direction.RIGHT;
+    // If we moved non-adjacently (fast drag), dragDir remains undefined and we use default direction logic in placeBuilding.
 
-    if (selectedBuilding === BuildingType.BELT) {
+    if (dragDir !== undefined) {
+      // If dragging out from a source (Extractor or Machine), this step sets its direction!
       setGameState(prev => {
         const newGrid = modifyTile(prev.grid, prevPos.x, prevPos.y, { direction: dragDir });
         return { ...prev, grid: newGrid };
       });
-      placeBuilding(x, y, dragDir);
+      placeBuilding(x, y, dragDir, effectiveBuildingType);
     } else {
-      placeBuilding(x, y);
+      placeBuilding(x, y, undefined, effectiveBuildingType);
     }
     lastDragPos.current = { x, y };
   };

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { BuildingType, Difficulty } from '../types';
-import { ArrowUp, Plus, Minus, X, Divide, Trash2, RotateCw, Eraser, ChevronsUp } from 'lucide-react';
+import { ArrowUp, Plus, Minus, X, Divide, RotateCw, Eraser, ChevronsUp } from 'lucide-react';
 import clsx from 'clsx';
 
 interface ControlsProps {
@@ -23,7 +23,6 @@ const Controls: React.FC<ControlsProps> = ({ selectedBuilding, onSelect, selecte
     { type: BuildingType.SUBTRACTOR, icon: <Minus size={20} />, label: '减法', color: 'bg-red-100 text-red-700' },
     { type: BuildingType.MULTIPLIER, icon: <X size={20} />, label: '乘法', color: 'bg-purple-100 text-purple-700' },
     { type: BuildingType.DIVIDER, icon: <Divide size={20} />, label: '除法', color: 'bg-orange-100 text-orange-700' },
-    { type: BuildingType.TRASH, icon: <Trash2 size={20} />, label: '垃圾桶', color: 'bg-slate-200 text-slate-600' },
   ];
 
   if (difficulty === 'EASY') {

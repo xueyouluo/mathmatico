@@ -14,30 +14,24 @@ interface GridCellProps {
 
 const GridCell: React.FC<GridCellProps> = ({ tile, onMouseDown, onMouseEnter, onContextMenu }) => {
   
+  const getInverseRotation = () => {
+    switch (tile.direction) {
+      case Direction.UP: return 'rotate-0';
+      case Direction.RIGHT: return '-rotate-90';
+      case Direction.DOWN: return '-rotate-180';
+      case Direction.LEFT: return 'rotate-90';
+      default: return 'rotate-0';
+    }
+  };
+
   const getIcon = () => {
     const iconProps = { size: 28, strokeWidth: 2.5 };
     
-    // Helper for Directional Inputs (Arrows only, no text)
-    const InputGuides = () => (
-      <>
-        {/* Main Input (Back) - Green Arrow */}
-        <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-emerald-500 opacity-60 animate-pulse">
-          <ChevronUp size={16} strokeWidth={3} />
-        </div>
-        {/* Side Inputs - Red/Orange Arrows */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 text-rose-500 opacity-60">
-           <ChevronRight size={16} strokeWidth={3} />
-        </div>
-        <div className="absolute right-0 top-1/2 -translate-y-1/2 text-rose-500 opacity-60">
-           <ChevronLeft size={16} strokeWidth={3} />
-        </div>
-      </>
-    );
-
     // Helper to render the dynamic operation text overlay
     const OperationOverlay = (symbol: string) => {
+      // ... (color logic same as before)
+      let content;
       if (tile.storedItems.length === 0) {
-         // Default icon when empty
          const Icon = 
             symbol === '+' ? Plus : 
             symbol === '-' ? Minus : 
@@ -48,43 +42,52 @@ const GridCell: React.FC<GridCellProps> = ({ tile, onMouseDown, onMouseEnter, on
             symbol === '-' ? "text-red-600" : 
             symbol === '×' ? "text-purple-600" : "text-orange-600";
             
-         return <Icon {...iconProps} className={clsx(color, "relative z-10")} />;
-      }
-
-      // Dynamic Text Display
-      let text = symbol;
-      const isCommutative = symbol === '+' || symbol === '×';
-      
-      if (isCommutative) {
-         const v1 = tile.storedItems[0]?.item.value;
-         const v2 = tile.storedItems[1]?.item.value;
-         if (tile.storedItems.length === 1) {
-            text = `${v1} ${symbol} ?`;
-         } else if (tile.storedItems.length >= 2) {
-            text = `${v1} ${symbol} ${v2}`;
-         }
+         content = <Icon {...iconProps} className={clsx(color, "relative z-10")} />;
       } else {
-         // Directional Logic for - and ÷
-         // Need to match logic in gameLogic.ts
-         // Current Tile Direction is Output. Back Input is (Dir + 2) % 4.
-         const backDir = (tile.direction + 2) % 4;
-         
-         const mainItem = tile.storedItems.find(slot => slot.fromDir === backDir);
-         const sideItem = tile.storedItems.find(slot => slot.fromDir !== backDir);
-         
-         const mainVal = mainItem ? mainItem.item.value : '?';
-         const sideVal = sideItem ? sideItem.item.value : '?';
-         
-         text = `${mainVal} ${symbol} ${sideVal}`;
+          // Dynamic Text Display
+          let text = symbol;
+          
+          let v1, v2;
+          
+          if (tile.fixedInputDir !== undefined && (tile.building === BuildingType.SUBTRACTOR || tile.building === BuildingType.DIVIDER)) {
+              // Locked Mode: v1 is FIXED direction, v2 is OTHER
+              const itemA = tile.storedItems.find(i => i.fromDir === tile.fixedInputDir);
+              const itemB = tile.storedItems.find(i => i.fromDir !== tile.fixedInputDir);
+              v1 = itemA ? itemA.item.value : '?';
+              v2 = itemB ? itemB.item.value : '?';
+              
+              text = `${v1} ${symbol} ${v2}`;
+          } else {
+              // FIFO Mode
+              v1 = tile.storedItems[0]?.item.value;
+              v2 = tile.storedItems[1]?.item.value;
+              
+              if (tile.storedItems.length === 1) {
+                text = `${v1} ${symbol} ?`;
+              } else if (tile.storedItems.length >= 2) {
+                text = `${v1} ${symbol} ${v2}`;
+              }
+          }
+          
+          const fontSize = text.length > 5 ? "text-[10px]" : text.length > 3 ? "text-xs" : "text-sm";
+          content = text;
+          
+          return (
+            <div className={clsx("relative z-10 font-black bg-white/80 px-1 rounded border border-gray-200 shadow-sm whitespace-nowrap flex items-center justify-center min-w-[2rem] h-6", fontSize, getInverseRotation())}>
+               {content}
+            </div>
+          );
       }
-
-      // Adjust font size based on length
-      const fontSize = text.length > 5 ? "text-[10px]" : text.length > 3 ? "text-xs" : "text-sm";
-
+      
+      // For Icon state, we also want it upright? Usually icons are rotation-agnostic (like + or x).
+      // But Minus (-) needs to be horizontal. 
+      // Let's wrap the icon in the inverse rotation too if it's Minus or Divide?
+      // Or just wrap everything.
+      
       return (
-        <div className={clsx("relative z-10 font-black bg-white/80 px-1 rounded border border-gray-200 shadow-sm whitespace-nowrap", fontSize)}>
-           {text}
-        </div>
+         <div className={clsx("relative z-10 flex items-center justify-center", getInverseRotation())}>
+             {content}
+         </div>
       );
     };
 
@@ -109,7 +112,6 @@ const GridCell: React.FC<GridCellProps> = ({ tile, onMouseDown, onMouseEnter, on
       case BuildingType.SUBTRACTOR:
         return (
           <div className="relative w-full h-full flex items-center justify-center">
-             <InputGuides />
              {OperationOverlay('-')}
           </div>
         );
@@ -118,7 +120,6 @@ const GridCell: React.FC<GridCellProps> = ({ tile, onMouseDown, onMouseEnter, on
       case BuildingType.DIVIDER:
         return (
           <div className="relative w-full h-full flex items-center justify-center">
-             <InputGuides />
              {/* Use a custom symbol for divide if needed, but text works well */}
              {OperationOverlay('÷')}
           </div>
@@ -153,11 +154,6 @@ const GridCell: React.FC<GridCellProps> = ({ tile, onMouseDown, onMouseEnter, on
       default: return 'bg-white border-indigo-200 shadow-sm'; // Processors
     }
   };
-
-  const isDirectional = 
-    tile.building !== BuildingType.NONE && 
-    tile.building !== BuildingType.HUB && 
-    tile.building !== BuildingType.TRASH;
 
   // Dynamic text size for items floating on belt
   const getItemTextSize = (val: number) => {
@@ -199,16 +195,6 @@ const GridCell: React.FC<GridCellProps> = ({ tile, onMouseDown, onMouseEnter, on
       <div className={clsx("absolute w-full h-full flex items-center justify-center pointer-events-none transition-transform duration-200", getRotation())}>
         {getIcon()}
       </div>
-
-      {/* CLEAR Direction Indicator Overlay for Machines (Not Belts, they are the arrow) */}
-      {isDirectional && tile.building !== BuildingType.BELT && (
-         <div className={clsx("absolute inset-0 pointer-events-none", getRotation())}>
-            {/* A prominent arrow at the 'top' (which becomes direction after rotation) */}
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-indigo-500 opacity-80 filter drop-shadow-sm">
-               <ArrowUp size={20} strokeWidth={4} fill="currentColor" />
-            </div>
-         </div>
-      )}
 
       {/* Item Layer (Floating on top) */}
       {tile.item && (
